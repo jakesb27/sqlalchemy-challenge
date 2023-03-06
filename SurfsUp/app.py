@@ -4,7 +4,6 @@ from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, func
 
-
 #################################################
 # Database Setup
 #################################################
@@ -22,7 +21,6 @@ Base.prepare(autoload_with=engine)
 Measurement = Base.classes.measurement
 Station = Base.classes.station
 
-
 #################################################
 # Flask Setup
 #################################################
@@ -36,15 +34,15 @@ app = Flask(__name__)
 
 @app.route("/")
 def index():
-    """List all avaialble api routes."""
+    """List all available api routes."""
 
-    routes = "<h1>Welcome!</h1><br/>"\
-        "Below are the avaialable api routes.<br/><br/>"\
-        "<a href='/api/v1.0/precipitation'> /api/v1.0/precipitation <a/><br/>"\
-        "<a href='/api/v1.0/stations'> /api/v1.0/stations <a/><br/>"\
-        "<a href='/api/v1.0/tobs'> /api/v1.0/tobs <a/><br/>"\
-        "/api/v1.0/{start date}<br/>"\
-        "/api/v1.0/{start date}/{end date}"
+    routes = "<h1>Welcome!</h1><br/>" \
+             "Below are the avaialable api routes.<br/><br/>" \
+             "<a href='/api/v1.0/precipitation'> /api/v1.0/precipitation <a/><br/>" \
+             "<a href='/api/v1.0/stations'> /api/v1.0/stations <a/><br/>" \
+             "<a href='/api/v1.0/tobs'> /api/v1.0/tobs <a/><br/>" \
+             "/api/v1.0/{start date}<br/>" \
+             "/api/v1.0/{start date}/{end date}"
 
     return routes
 
@@ -59,30 +57,30 @@ def precipitation():
 @app.route("/api/v1.0/stations")
 def stations():
     """Route for handling stations api"""
-    
+
     return "stations"
 
 
 @app.route("/api/v1.0/tobs")
 def tobs():
     """Route for handling temperature api"""
-    
+
     return "tobs"
 
 
 @app.route("/api/v1.0/<start>")
 def start_date(start):
     """Route for handling min, max, and avg for dates greater or equal to start"""
-    
+
     return f"Start date: {start}"
 
 
 @app.route("/api/v1.0/<start>/<end>")
 def start_end_date(start, end):
     """Route for handling min, max, and avg for dates between start and end"""
-    
-    return f"Start date: {start}<br/>"\
-            f"End date: {end}"
+
+    return f"Start date: {start}<br/>" \
+           f"End date: {end}"
 
 
 if __name__ == "__main__":
