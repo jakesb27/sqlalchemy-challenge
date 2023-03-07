@@ -38,11 +38,12 @@ def index():
     """List all available api routes."""
 
     routes = "<h1>Welcome!</h1><br/>" \
-             "Below are the avaialable api routes.<br/><br/>" \
+             "Below are the avaialable api routes.<br/>" \
+             "Date parameters should be in 'MMDDYYYY' format.<br/>" \
+             "This dataset is from 01/01/2010 - 08/23/2017.<br/><br/>" \
              "/api/v1.0/precipitation<br/>" \
              "/api/v1.0/stations<br/>" \
-             "/api/v1.0/tobs<br/><br/>" \
-             "Dates should be in 'MMDDYYYY' format.<br/><br/>" \
+             "/api/v1.0/tobs<br/>" \
              "/api/v1.0/{start date}<br/>" \
              "/api/v1.0/{start date}/{end date}"
 
@@ -56,12 +57,8 @@ def precipitation():
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    # Get the most recent date in the dataset
-    recent_date = session. \
-        query(Measurement.date).order_by(Measurement.date.desc()).first()[0]
-
-    # Calculate the date one year from the last date in data set.
-    one_year_date = (dt.datetime.strptime(recent_date, "%Y-%m-%d") - dt.timedelta(days=365)).strftime('%Y-%m-%d')
+    # Get the date 12 months back from most recent date
+    one_year_date = twelve_month_date()
 
     # Query to retrieve the date and precipitation scores
     precip_data = session. \
@@ -123,11 +120,8 @@ def tobs():
         group_by(Measurement.station).\
         order_by(func.count(Measurement.station).desc()).first()[0]
 
-    # Get the most recent date in the dataset
-    recent_date = session.query(Measurement.date).order_by(Measurement.date.desc()).first()[0]
-
     # Calculate the date one year from the last date in data set.
-    one_year_date = (dt.datetime.strptime(recent_date, "%Y-%m-%d") - dt.timedelta(days=365)).strftime('%Y-%m-%d')
+    one_year_date = twelve_month_date()
 
     # Query temp for most active station for previous year
     temp_data = session. \
@@ -139,10 +133,10 @@ def tobs():
 
     # Store returned data into a list of dictionaries
     temp_list = []
-    for date, tobs in temp_data:
+    for date, temp in temp_data:
         temp_dict = {
             'date': date,
-            'tobs': tobs
+            'tobs': temp
         }
         temp_list.append(temp_dict)
 
@@ -154,31 +148,40 @@ def single_date(start):
     """Route for handling min, max, and avg for dates greater or equal to start"""
 
     # Convert start date into datetime object
-    start_date = dt.datetime.strptime(start, "%m%d%Y").strftime('%Y-%m-%d')
+    if verify_date(start):
+        start_date = dt.datetime.strptime(start, "%m%d%Y").strftime('%Y-%m-%d')
 
-    # Create our session (link) from Python to the DB
-    session = Session(engine)
+        # Create our session (link) from Python to the DB
+        session = Session(engine)
 
-    # Query aggregate temperatures
-    agg_temps = session. \
-        query(Measurement.date, func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)). \
-        filter(Measurement.date >= start_date). \
-        group_by(Measurement.date).all()
+        # Query aggregate temperatures
+        agg_temps = session.query(
+                Measurement.date,
+                func.min(Measurement.tobs),
+                func.avg(Measurement.tobs),
+                func.max(Measurement.tobs)
+            ). \
+            filter(Measurement.date >= start_date). \
+            group_by(Measurement.date).all()
 
-    session.close()
+        session.close()
 
-    # Store returned data into a list of dictionaries
-    agg_list = []
-    for date, tmin, tavg, tmax in agg_temps:
-        agg_dict = {
-            'date': date,
-            'TMIN': tmin,
-            'TAVG': tavg,
-            'TMAX': tmax
-        }
-        agg_list.append(agg_dict)
+        # Store returned data into a list of dictionaries
+        agg_list = []
+        for date, tmin, tavg, tmax in agg_temps:
+            agg_dict = {
+                'date': date,
+                'TMIN': tmin,
+                'TAVG': tavg,
+                'TMAX': tmax
+            }
+            agg_list.append(agg_dict)
 
-    return jsonify(agg_list)
+        return jsonify(agg_list)
+    else:
+        # Invalid start date provided
+        return "Error: Start date entered is not valid or is outside of the dataset.<br/>" \
+               f"Start Date: {start}"
 
 
 @app.route("/api/v1.0/<start>/<end>")
@@ -186,33 +189,104 @@ def date_range(start, end):
     """Route for handling min, max, and avg for dates between start and end"""
 
     # Convert start and end dates into datetime objects
-    start_date = dt.datetime.strptime(start, "%m%d%Y").strftime('%Y-%m-%d')
-    end_date = dt.datetime.strptime(end, "%m%d%Y").strftime('%Y-%m-%d')
+    if verify_date(start):
+        if verify_date(end):
+            start_date = dt.datetime.strptime(start, "%m%d%Y").strftime('%Y-%m-%d')
+            end_date = dt.datetime.strptime(end, "%m%d%Y").strftime('%Y-%m-%d')
+
+            # Create our session (link) from Python to the DB
+            session = Session(engine)
+
+            # Query aggregate temperatures
+            agg_temps = session.query(
+                    Measurement.date,
+                    func.min(Measurement.tobs),
+                    func.avg(Measurement.tobs),
+                    func.max(Measurement.tobs)
+                ). \
+                filter(Measurement.date >= start_date). \
+                filter(Measurement.date <= end_date). \
+                group_by(Measurement.date).all()
+
+            session.close()
+
+            # If results are empty, date range is invalid.
+            if len(agg_temps) == 0:
+                return "Error: Start date is greater than end date.<br/>" \
+                       f"Start date: {start_date}<br/>" \
+                       f"End date: {end_date}"
+
+            # Store returned data into a list of dictionaries
+            agg_list = []
+            for date, tmin, tavg, tmax in agg_temps:
+                agg_dict = {
+                    'date': date,
+                    'TMIN': tmin,
+                    'TAVG': tavg,
+                    'TMAX': tmax
+                }
+                agg_list.append(agg_dict)
+
+            return jsonify(agg_list)
+        else:
+            # Invalid end date provided
+            return "Error: End date entered is not valid or is outside of the dataset.<br/>" \
+                   f"End Date: {end}"
+    else:
+        # Invalid start date provided
+        return "Error: Start date entered is not valid or is outside of the dataset.<br/>" \
+               f"Start Date: {start}"
+
+
+#################################################
+# Helper Methods
+#################################################
+
+def twelve_month_date():
+    """Returns the most recent date in the dataset minus 12 months"""
 
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    # Query aggregate temperatures
-    agg_temps = session. \
-        query(Measurement.date, func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)). \
-        filter(Measurement.date >= start_date). \
-        filter(Measurement.date <= end_date). \
-        group_by(Measurement.date).all()
+    # Get the most recent date in the dataset
+    recent_date = session. \
+        query(Measurement.date).order_by(Measurement.date.desc()).first()[0]
+
+    # Calculate the date one year from the last date in data set.
+    one_year_date = (dt.datetime.strptime(recent_date, "%Y-%m-%d") - dt.timedelta(days=365)).strftime('%Y-%m-%d')
 
     session.close()
 
-    # Store returned data into a list of dictionaries
-    agg_list = []
-    for date, tmin, tavg, tmax in agg_temps:
-        agg_dict = {
-            'date': date,
-            'TMIN': tmin,
-            'TAVG': tavg,
-            'TMAX': tmax
-        }
-        agg_list.append(agg_dict)
+    return one_year_date
 
-    return jsonify(agg_list)
+
+def verify_date(date):
+    """Verifies input date is correct date and if available in dataset"""
+
+    session = Session(engine)
+
+    try:
+        # Try to convert date into datetime object and back to string
+        dt.datetime.strptime(date, "%m%d%Y").strftime('%Y-%m-%d')
+
+    except ValueError:
+        # Date provided is not valid
+        session.close()
+        return False
+
+    else:
+        # Query Measurement table for date provided to validate
+        val_date = dt.datetime.strptime(date, "%m%d%Y").strftime('%Y-%m-%d')
+        result = session.query(Measurement.date). \
+            filter(Measurement.date == val_date).all()
+
+        # Date provided is outside the dataset
+        if len(result) == 0:
+            session.close()
+            return False
+
+        session.close()
+        return True
 
 
 if __name__ == "__main__":
