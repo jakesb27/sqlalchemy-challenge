@@ -70,11 +70,9 @@ def precipitation():
     # Store records in a list of dictionaries
     precip_list = []
     for date, prcp in precip_data:
-        precip_dict = {
-            'date': date,
-            'prcp': prcp
-        }
-        precip_list.append(precip_dict)
+        precip_list.append(
+            {date: prcp}
+        )
 
     return jsonify(precip_list)
 
@@ -134,13 +132,13 @@ def tobs():
     # Store returned data into a list of dictionaries
     temp_list = []
     for date, temp in temp_data:
-        temp_dict = {
-            'date': date,
-            'tobs': temp
-        }
-        temp_list.append(temp_dict)
+        temp_list.append(
+            {date: temp}
+        )
 
-    return jsonify(temp_list)
+    final_dict = {most_active: temp_list}
+
+    return jsonify(final_dict)
 
 
 @app.route("/api/v1.0/<start>")
@@ -148,7 +146,7 @@ def single_date(start):
     """Route for handling min, max, and avg for dates greater or equal to start"""
 
     # Convert start date into datetime object
-    if verify_date(start):
+    if date_is_valid(start):
         start_date = dt.datetime.strptime(start, "%m%d%Y").strftime('%Y-%m-%d')
 
         # Create our session (link) from Python to the DB
@@ -189,8 +187,8 @@ def date_range(start, end):
     """Route for handling min, max, and avg for dates between start and end"""
 
     # Convert start and end dates into datetime objects
-    if verify_date(start):
-        if verify_date(end):
+    if date_is_valid(start):
+        if date_is_valid(end):
             start_date = dt.datetime.strptime(start, "%m%d%Y").strftime('%Y-%m-%d')
             end_date = dt.datetime.strptime(end, "%m%d%Y").strftime('%Y-%m-%d')
 
@@ -260,7 +258,7 @@ def twelve_month_date():
     return one_year_date
 
 
-def verify_date(date):
+def date_is_valid(date):
     """Verifies input date is correct date and if available in dataset"""
 
     session = Session(engine)
